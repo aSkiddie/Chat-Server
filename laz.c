@@ -88,19 +88,53 @@ int main(void) {
 
     while(1) {
 
+        fd_set reads;
+        FD_ZERO(&reads);
+        FD_SET(socket_descriptor, &reads);
+#if !defined(_WIN32)
+        FD_SET(0, &reads);
+#endif
+
+        struct timeval timevalue;
+        timevalue.tv_sec = 0;
+        timevalue.tv_usec = 100000;
 
 
+        if(select(socket_descriptor + 1, &reads, 0, 0, &timevalue) < 0) {
+            fprintf(stderr, "select function failed\n", GETSOCKETERRNO());
+            return(-1);
+        }
 
-
-
-
+        if(FD_ISSET(socket_descriptor, &reads)){
+            char receiving_buffer[MAX_LEN_MSG];
+            int bytes_received = recv(socket_descriptor, receiving_buffer,
+                                      MAX_LEN_MSG, 0);
+            if (bytes_received < 1) {
+                printf("Connection closed by peer.\n");
+                break;
+            }
+            printf("%.*s", bytes_received, receiving_buffer);
+        }
+#if defined(_WIN32)
+        if(_kbhit()) {
+#else
+        if(FD_ISSET(0, &reads)) {
+#endif // defined
+            char sending_buffer[MAX_LEN_MSG];
+            if (!fgets(sending_buffer, MAX_LEN_MSG, stdin)) break;
+            int bytes_sent = send(socket_descriptor, sending_buffer,
+                                   strlen(sending_buffer), 0);
+        }
     }
+    CLOSESOCKET(socket_descriptor);
+#if defined (_WIN32)
+    WSACleanup();
+#endif // defined
 
-
-
-
+    printf("All Done.\n");
     return 0;
 }
+
 
 void getline(char *input, int maxlen) {
     int c, i;
